@@ -1,0 +1,62 @@
+---
+title: "Two Parameters"
+author: "Gitanjali Sheth"
+format: html
+execute: 
+  echo: false
+---
+
+
+
+
+```{r}
+#| message: FALSE
+
+library(tidyverse)
+library(primer.data)
+library(tidybayes)
+library(brms)
+library(gtsummary)
+
+nhanes |> filter(sex=="Male", age>18) |> select(height) |> drop_na() |>
+ggplot(aes(x=height)) + geom_histogram(bins = 50) +
+labs(title = "Male Adult Height in the US in 2010", x="Height(cm)", y="Count")
+```
+
+```{r}
+#| cache: TRUE
+ch5 <- nhanes |>
+  filter(sex == "Male", age >= 18) |>
+  select(height) |>
+  drop_na()
+
+fit_male_height <- brm(formula = height ~ 1, data = ch5, family = gaussian(), silent = 2, refresh = 0, seed=12)
+
+```
+
+```{r}
+tbl_regression(fit_male_height, intercept=TRUE)
+
+```
+
+```{r}
+#| label: plot
+
+ndata <- tibble(.rows = 1)
+
+fit_male_height |> add_predicted_draws(newdata = ndata) |>
+ggplot(aes(x=.prediction)) + 
+geom_histogram(aes(y=after_stat(count / sum(count))), bins = 100) +
+labs(title = "Prediction of Male Height in the US", x="Height Prediction", y="Count") +
+scale_x_continuous(labels = scales::number_format()) +
+scale_y_continuous(labels = scales::percent_format(accuracy = 1))
+```
+
+Using data from the National Health and Nutrition Examination Survey conducted from 2009 to 2011, we seek to create a model of height for adult men. In particular, what is the average height of an adult male in America in 2024? Since participation in the survey is voluntary, it could mean that, for example, taller men are more likely to answer this question. We modeled height using an intercept-only regression. The average height of adult men in America in 2024 is 176 cm, with standard deviation of 7.48 cm.
+
+```{r}
+fit_male_height |> add_predicted_draws(newdata = ndata) |>
+mutate(tall = if_else(.prediction > 180, TRUE, FALSE)) |>
+summarize(odds = mean(tall))
+```
+
